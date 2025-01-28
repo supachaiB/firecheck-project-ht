@@ -1,0 +1,55 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "fire-check-db",
+          "appId": "1:1084138640762:android:57bb89bc2ecdcf061a72c3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "fire-check-db",
+          "configurations": {
+            "android": "1:1084138640762:android:57bb89bc2ecdcf061a72c3",
+            "ios": "1:1084138640762:ios:53bf5b2a449a52601a72c3",
+            "macos": "1:1084138640762:ios:53bf5b2a449a52601a72c3",
+            "web": "1:1084138640762:web:06bfe78abe0591a41a72c3",
+            "windows": "1:1084138640762:web:1707c08ccb1168751a72c3"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/user/**",   
+        "destination": "/index.html"
+      },
+      {
+        "source": "/inspectionhistory",   
+        "destination": "/index.html"
+      },
+      {
+        "source": "/firetankstatus",  
+        "destination": "/index.html"
+      },
+      {
+        "source": "/firetankstatus",  
+        "destination": "/index.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
