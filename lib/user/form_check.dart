@@ -61,7 +61,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
         fetchImageData(); // ดึงข้อมูลภาพเมื่อได้ fireTankType
       }
     } catch (e) {
-      print("Error fetching firetank type: $e");
+      //print("Error fetching firetank type: $e");
     }
   }
 
@@ -244,6 +244,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
           'Form Check',
           style: TextStyle(fontSize: fontSize * 1.2),
         ),
+        automaticallyImplyLeading: false, // ไม่แสดงลูกศรด้านซ้าย
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
