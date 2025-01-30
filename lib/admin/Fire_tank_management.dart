@@ -17,40 +17,64 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
   String? _selectedType;
   String _searchTankId = '';
 
-  final List<String> _buildings = [
-    '10 ชั้น',
-    'หลวงปู่ขาว',
-    'OPD',
-    '114 เตียง',
-    'NSU',
-    '60 เตียง',
-    'เมตตา',
-    'โภชนาศาสตร์',
-    'จิตเวช',
-    'กายภาพ&ธนาคารเลือด',
-    'พัฒนากระตุ้นเด็ก',
-    'จ่ายกลาง',
-    'ซักฟอก',
-    'ผลิตงาน & โรงงานช่าง',
-  ]; // ตัวอย่างข้อมูลอาคาร
-  final List<String> _floors = [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    '11'
-  ]; // ตัวอย่างข้อมูลชั้น
-  final List<String> _types = [
-    'ผงเคมีแห้ง',
-    'co2',
-    'bf2000'
-  ]; // ตัวอย่างข้อมูลประเภท
+  List<String> _buildings = [];
+  List<String> _floors = [];
+
+  List<String> _types = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchBuildings();
+    _fetchTypes();
+  }
+
+  Future<void> _fetchTypes() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('FE_type').get();
+      setState(() {
+        _types = snapshot.docs
+            .map((doc) => doc['type'].toString())
+            .toList(); // ดึงข้อมูลประเภทและเพิ่มลงใน _typeList
+      });
+    } catch (e) {
+      print('Error fetching types: $e');
+    }
+  }
+
+  Future<void> fetchBuildings() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('firetank_Collection')
+        .get();
+    final buildings =
+        snapshot.docs.map((doc) => doc['building'] as String).toSet().toList();
+
+    setState(() {
+      _buildings = buildings;
+    });
+  }
+
+  /// ดึงรายชื่อชั้นของอาคารที่เลือก
+  Future<void> fetchFloors(String building) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('firetank_Collection')
+        .where('building', isEqualTo: building)
+        .get();
+
+    final floors = snapshot.docs
+        .map((doc) => doc['floor'].toString()) // แปลงเป็น String
+        .toSet()
+        .toList();
+
+    floors.sort(
+        (a, b) => int.parse(a).compareTo(int.parse(b))); // เรียงจากน้อยไปมาก
+
+    setState(() {
+      _floors = floors;
+      _selectedFloor = null;
+    });
+  }
 
   // ฟังก์ชันแสดงการยืนยันการลบ
   void _confirmDelete(BuildContext context, String tankId) {
@@ -106,6 +130,8 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
                     onChanged: (value) {
                       setState(() {
                         _selectedBuilding = value;
+                        _selectedFloor = null;
+                        fetchFloors(value!); // อัปเดตรายชื่อชั้นเมื่อเลือกอาคาร
                       });
                     },
                     items: _buildings
@@ -235,8 +261,10 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
 
                   // ฟิลเตอร์ Tank ID หลังจากดึงข้อมูลจาก Firebase
                   final tanks = snapshot.data!.docs.where((doc) {
-                    final tankId = doc['tank_id'] as String;
-                    return tankId.contains(_searchTankId);
+                    final tankId = (doc['tank_id'] as String)
+                        .toLowerCase(); // แปลงเป็นพิมพ์เล็ก
+                    return tankId.contains(
+                        _searchTankId.toLowerCase()); // ค้นหาแบบไม่สนตัวพิมพ์
                   }).toList();
 
                   if (tanks.isEmpty) {
@@ -274,19 +302,20 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              IconButton(
+                              /*IconButton(
                                 icon:
                                     const Icon(Icons.edit, color: Colors.blue),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) =>
-                                          FireTankFormPage(editTank: tank),
+                                      builder: (context) => FireTankFormPage(
+                                          tankIdToEdit: tank[
+                                              'tank_id']), // ส่งค่า tank_id
                                     ),
                                   );
                                 },
-                              ),
+                              ),*/
                               IconButton(
                                 icon:
                                     const Icon(Icons.delete, color: Colors.red),
@@ -323,9 +352,7 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
 }
 
 class FireTankFormPage extends StatefulWidget {
-  final QueryDocumentSnapshot<Object?>? editTank;
-
-  const FireTankFormPage({Key? key, this.editTank}) : super(key: key);
+  const FireTankFormPage({Key? key}) : super(key: key);
 
   @override
   _FireTankFormPageState createState() => _FireTankFormPageState();
@@ -334,29 +361,80 @@ class FireTankFormPage extends StatefulWidget {
 class _FireTankFormPageState extends State<FireTankFormPage> {
   final TextEditingController _fireExtinguisherIdController =
       TextEditingController();
-  String? _type; // เปลี่ยนจาก TextEditingController เป็น String?
-  String? _building; // เปลี่ยนจาก TextEditingController เป็น String?
-  String? _floor; // เปลี่ยนจาก TextEditingController เป็น String?
+  String? _type;
+  String? _building;
+  String? _floor;
   DateTime _installationDate = DateTime.now();
   String? _qrCode;
+
+  List<String> _buildingList = [];
+  List<String> _typeList = [];
+  int _totalFloors = 1;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.editTank != null) {
-      // ถ้าเป็นการแก้ไขข้อมูล
-      _fireExtinguisherIdController.text = widget.editTank!['tank_id'];
-      _type = widget.editTank!['type'];
-      _building = widget.editTank!['building'];
-      _floor = widget.editTank!['floor'];
-      _installationDate =
-          (widget.editTank!['installation_date'] as Timestamp).toDate();
-    } else {
-      // ถ้าเป็นการเพิ่มข้อมูลใหม่
-      _getNextId().then((nextId) {
+    _fetchBuildings();
+    _fetchTypes(); // ดึงข้อมูลประเภทจาก FE_type
+
+    // ดึงหมายเลขถังสำหรับการเพิ่มใหม่
+    _getNextId().then((nextId) {
+      setState(() {
+        _fireExtinguisherIdController.text = nextId;
+      });
+    });
+  }
+
+  // ฟังก์ชันดึงข้อมูลประเภทจาก collection 'FE_type'
+  Future<void> _fetchTypes() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('FE_type').get();
+      setState(() {
+        _typeList = snapshot.docs
+            .map((doc) => doc['type'].toString())
+            .toList(); // ดึงข้อมูลประเภทและเพิ่มลงใน _typeList
+      });
+    } catch (e) {
+      print('Error fetching types: $e');
+    }
+  }
+
+  Future<void> _fetchBuildings() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('buildings').get();
+      setState(() {
+        _buildingList =
+            snapshot.docs.map((doc) => doc['name'].toString()).toList();
+      });
+    } catch (e) {
+      print('Error fetching buildings: $e');
+    }
+  }
+
+  Future<void> _fetchTotalFloors(String buildingName) async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('buildings')
+          .where('name', isEqualTo: buildingName)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
         setState(() {
-          _fireExtinguisherIdController.text = nextId;
+          _totalFloors = int.parse(snapshot.docs.first['totalFloors']);
+          _floor = null;
         });
+      }
+    } catch (e) {
+      print('Error fetching total floors: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -388,93 +466,52 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
         final number = int.parse(lastId.replaceAll(RegExp(r'\D'), '')) + 1;
         return 'FE${number.toString().padLeft(3, '0')}';
       } else {
-        return 'FE001'; // ถ้าไม่มีข้อมูลในฐานข้อมูล
+        return 'FE001';
       }
     } catch (e) {
       print('Error getting next ID: $e');
-      return 'FE001'; // fallback ID
+      return 'FE001';
     }
-  }
-
-  Future<void> _saveTankData() async {
-    try {
-      // บันทึกข้อมูลใหม่ด้วย ID ถัดไป
-      await FirebaseFirestore.instance.collection('firetank_Collection').add({
-        'status': 'checked', // ข้อมูลอื่นๆ
-        'date_checked': Timestamp.now(),
-      });
-
-      // อัปเดตค่าในฟอร์มให้แสดง ID ถัดไป
-      setState(() {});
-    } catch (e) {
-      print("Error saving tank data: $e");
-    }
-  }
-
-  // ฟังก์ชันเพื่อดึง Fire Extinguisher ID ถัดไป
-
-  // ฟังก์ชันคำนวณ ID ถัดไป
-  String _generateNextId(String latestId) {
-    String numericPart = latestId.substring(2); // ตัด "FE" ออก
-    int nextIdNumber = int.parse(numericPart) + 1; // เพิ่ม 1
-    String nextId = 'FE' +
-        nextIdNumber
-            .toString()
-            .padLeft(3, '0'); // ใช้ padLeft เพื่อให้ตัวเลขมี 3 หลัก
-    return nextId;
   }
 
   Future<void> _generateQRCode(String tankId) async {
-    // ใช้ tankId เป็นข้อมูลในการสร้าง QR Code
-    _qrCode =
-        'https://fire-check-db.web.app/user?tankId=$tankId'; // URL หรือข้อมูลที่ต้องการสร้าง QR
+    _qrCode = 'https://fire-check-db.web.app/user?tankId=$tankId';
   }
 
-  // ฟังก์ชันบันทึกข้อมูล
   Future<void> _saveFireTankData() async {
     try {
       final newId = _fireExtinguisherIdController.text;
 
-      // สร้าง QR Code
-      await _generateQRCode(newId); // << เพิ่มตรงนี้
-
-      if (widget.editTank == null) {
-        // เพิ่มข้อมูลใหม่
-        await FirebaseFirestore.instance.collection('firetank_Collection').add({
-          'tank_id': newId,
-          'type': _type,
-          'building': _building,
-          'floor': _floor,
-          'status': 'ตรวจสอบแล้ว',
-          'installation_date': _installationDate, // บันทึกวันที่ติดตั้ง
-          'qrcode': _qrCode, // << เพิ่มตรงนี้
-        });
+      if (_type == null || _building == null || _floor == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
+          const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
         );
-      } else {
-        // แก้ไขข้อมูลเดิม
-        await FirebaseFirestore.instance
-            .collection('firetank_Collection')
-            .doc(widget.editTank!.id)
-            .update({
-          'tank_id': newId,
-          'type': _type,
-          'building': _building,
-          'floor': _floor,
-          'status': 'ตรวจสอบแล้ว',
-          'installation_date': _installationDate, // อัปเดตวันที่ติดตั้ง
-          'qrcode': _qrCode, // << เพิ่มตรงนี้
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('แก้ไขข้อมูลสำเร็จ')),
-        );
+        return;
       }
-      Navigator.pop(context);
+
+      await _generateQRCode(newId);
+
+      // การเพิ่มข้อมูลใหม่
+      await FirebaseFirestore.instance.collection('firetank_Collection').add({
+        'tank_id': newId,
+        'type': _type,
+        'building': _building,
+        'floor': _floor,
+        'status': 'ตรวจสอบแล้ว',
+        'installation_date': _installationDate,
+        'qrcode': _qrCode,
+      });
+      // หลังจากบันทึกข้อมูลเสร็จ
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
+      );
+
+      Navigator.pop(context); // กลับไปที่หน้าก่อนหน้า
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
       );
+      print("Error saving document: $e");
     }
   }
 
@@ -482,9 +519,7 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.editTank == null
-            ? 'เพิ่มข้อมูลถังดับเพลิง'
-            : 'แก้ไขข้อมูลถังดับเพลิง'),
+        title: const Text('เพิ่มข้อมูลถังดับเพลิง'),
         backgroundColor: Colors.deepPurple,
       ),
       body: Padding(
@@ -492,20 +527,21 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ฟอร์มสำหรับเลือกวันที่ติดตั้ง
+            if (_isLoading)
+              const Center(
+                child: CircularProgressIndicator(),
+              ),
             Row(
               children: [
                 Text(
                     'วันที่ติดตั้ง: ${DateFormat('dd/MM/yyyy').format(_installationDate)}'),
                 IconButton(
-                  icon: Icon(Icons.calendar_today),
+                  icon: const Icon(Icons.calendar_today),
                   onPressed: () => _selectInstallationDate(context),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-
-            // Fire Extinguisher ID Field (ที่จะแสดง FE + เลข)
             TextField(
               controller: _fireExtinguisherIdController,
               decoration: const InputDecoration(
@@ -514,87 +550,58 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
                 contentPadding:
                     EdgeInsets.symmetric(vertical: 10, horizontal: 16),
               ),
-              enabled: widget.editTank ==
-                  null, // ถ้าไม่ได้แก้ไข, สามารถเปลี่ยน ID ได้
             ),
-
             const SizedBox(height: 10),
-
-            // Dropdown for Type
-            DropdownButton<String>(
-              value: _type, // ใช้ _type แทน _typeController
-              hint: const Text('เลือกประเภท'),
-              onChanged: (String? newValue) {
+            DropdownButtonFormField<String>(
+              value: _type,
+              onChanged: (value) {
                 setState(() {
-                  _type = newValue;
+                  _type = value;
                 });
               },
-              items: [
-                'ผงเคมีแห้ง',
-                'co2',
-                'bf2000',
-              ].map<DropdownMenuItem<String>>((String value) {
+              items: _typeList.map((type) {
                 return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
+                  value: type,
+                  child: Text(type),
                 );
               }).toList(),
+              decoration: const InputDecoration(
+                labelText: 'ประเภทถังดับเพลิง',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 10),
-
-            // Dropdown for Building
             DropdownButton<String>(
-              value: _building, // ใช้ _building แทน _buildingController
+              value: _building,
               hint: const Text('เลือกอาคาร'),
               onChanged: (String? newValue) {
                 setState(() {
                   _building = newValue;
+                  _fetchTotalFloors(newValue!);
                 });
               },
-              items: [
-                '10 ชั้น',
-                'หลวงปู่ขาว',
-                'OPD',
-                '114 เตียง',
-                'NSU',
-                '60 เตียง',
-                'เมตตา',
-                'โภชนาศาสตร์',
-                'จิตเวช',
-                'กายภาพ&ธนาคารเลือด',
-                'พัฒนากระตุ้นเด็ก',
-                'จ่ายกลาง',
-                'ซักฟอก',
-                'ผลิตงาน & โรงงานช่าง',
-              ].map<DropdownMenuItem<String>>((String value) {
+              items: _buildingList.map((String value) {
                 return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
+                    value: value, child: Text(value));
               }).toList(),
             ),
             const SizedBox(height: 10),
-
-            // Dropdown for Floor
-            DropdownButton<String>(
-              value: _floor, // ใช้ _floor แทน _floorController
-              hint: const Text('เลือกชั้น'),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _floor = newValue;
-                });
-              },
-              items: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']
-                  .map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-            ),
+            if (_building != null)
+              DropdownButton<String>(
+                value: _floor,
+                hint: const Text('เลือกชั้น'),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _floor = newValue;
+                  });
+                },
+                items: List.generate(_totalFloors, (index) => '${index + 1}')
+                    .map((String value) {
+                  return DropdownMenuItem<String>(
+                      value: value, child: Text(value));
+                }).toList(),
+              ),
             const SizedBox(height: 20),
-
-            // Save Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -606,10 +613,7 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: Text(
-                  widget.editTank == null ? 'บันทึก' : 'อัปเดต',
-                  style: const TextStyle(fontSize: 16),
-                ),
+                child: const Text('บันทึก', style: TextStyle(fontSize: 16)),
               ),
             ),
           ],

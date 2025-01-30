@@ -43,11 +43,11 @@ class ScheduleBox extends StatelessWidget {
               ),
               SizedBox(height: 4),
               Text(
-                "ผู้ใช้ทั่วไปเหลือ :  $days วัน ",
+                "ผู้ใช้ทั่วไปเหลือ :  $days วัน $quarterHours ชั่วโมง",
                 style: TextStyle(fontSize: 14),
               ),
               Text(
-                "ช่างเทคนิคเหลือ : $quarterDays วัน ",
+                "ช่างเทคนิคเหลือ : $quarterDays วัน $quarterHours ชั่วโมง",
                 style: TextStyle(fontSize: 14),
               ),
             ],

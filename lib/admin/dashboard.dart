@@ -176,6 +176,13 @@ class _DashboardPageState extends State<DashboardPage> {
               Navigator.pushNamed(context, '/BuildingManagement');
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.local_fire_department),
+            title: const Text('ประเภทถังดับเพลิง'),
+            onTap: () {
+              Navigator.pushNamed(context, '/FireTankTypes');
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),

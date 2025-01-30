@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // สำหรับฟอร์แมตวันที่
 import 'package:cloud_firestore/cloud_firestore.dart'; // สำหรับ Firestore
 import 'firetank_details.dart'; // นำเข้าไฟล์ที่แสดงประวัติการตรวจสอบ
+import 'dart:convert'; // สำหรับการแปลง Base64
+import 'dart:typed_data'; // สำหรับ Uint8List
 
 class FormCheckPage extends StatefulWidget {
   final String tankId;
@@ -15,20 +17,20 @@ class FormCheckPage extends StatefulWidget {
 class _FormCheckPageState extends State<FormCheckPage> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
-  final Map<String, String> equipmentStatus = {
-    'สายวัด': 'ปกติ',
-    'คันบังคับ': 'ปกติ',
-    'ตัวถัง': 'ปกติ',
-    'มาตรวัด/น้ำหนัก': 'ปกติ',
-  };
   final TextEditingController _remarkController = TextEditingController();
   final TextEditingController _inspectorController = TextEditingController();
+  final TextEditingController _weightController =
+      TextEditingController(); // สำหรับกรอกน้ำหนัก
+
+  Map<String, String> equipmentStatus = {};
   List<String> staffList = [];
   List<String> filteredStaffList = [];
   String? selectedStaff;
   String? userType;
   String? latestCheckDate; // สำหรับวันที่ตรวจสอบล่าสุด
   String? latestCheckTime; // สำหรับเวลา
+  String? fireTankType; // เพิ่มตัวแปรเพื่อเก็บค่า type
+  Uint8List? imageBytes; // ตัวแปรเพื่อเก็บข้อมูลภาพ Base64 ที่แปลงแล้ว
 
   @override
   void initState() {
@@ -38,6 +40,67 @@ class _FormCheckPageState extends State<FormCheckPage> {
     _timeController.text =
         DateFormat('HH:mm').format(DateTime.now()); // เวลาปัจจุบัน
     fetchLatestCheckDate(); // ดึงข้อมูลวันที่ล่าสุด
+    fetchFireTankType(); // ดึงข้อมูล type ของ firetank_Collection
+  }
+
+  // ฟังก์ชันดึงข้อมูล type และภาพ Base64 จาก Firestore
+  Future<void> fetchFireTankType() async {
+    CollectionReference firetankCollection =
+        FirebaseFirestore.instance.collection('firetank_Collection');
+    try {
+      QuerySnapshot querySnapshot = await firetankCollection
+          .where('tank_id', isEqualTo: widget.tankId)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        setState(() {
+          fireTankType = querySnapshot.docs.first['type'];
+          _updateEquipmentStatus(); // ปรับเปลี่ยนรายการตรวจสอบตาม type
+        });
+        fetchImageData(); // ดึงข้อมูลภาพเมื่อได้ fireTankType
+      }
+    } catch (e) {
+      print("Error fetching firetank type: $e");
+    }
+  }
+
+  // ฟังก์ชันปรับรายการตรวจสอบตามประเภท
+  void _updateEquipmentStatus() {
+    if (fireTankType == 'BF2000' || fireTankType == 'ผงเคมีแห้ง') {
+      equipmentStatus = {
+        'มาตรวัด': 'ปกติ',
+        'สภาพผงเคมี': 'ปกติ',
+      };
+    } else if (fireTankType == 'CO2') {
+      equipmentStatus = {
+        'สภาพแรงดัน': 'ปกติ',
+        'น้ำหนัก(กก.)': '', // กรอกข้อความ
+      };
+    }
+  }
+
+  Future<void> fetchImageData() async {
+    if (fireTankType == null) return;
+
+    CollectionReference feTypeCollection =
+        FirebaseFirestore.instance.collection('FE_type');
+
+    try {
+      QuerySnapshot querySnapshot =
+          await feTypeCollection.where('type', isEqualTo: fireTankType).get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        String base64Image = querySnapshot.docs.first['imageData'];
+        Uint8List bytes = base64Decode(base64Image);
+
+        setState(() {
+          imageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      print("Error fetching image data: $e");
+    }
   }
 
   Future<void> fetchLatestCheckDate() async {
@@ -91,7 +154,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
     _dateController.text = DateFormat('yyyy-MM-dd').format(currentDateTime);
     _timeController.text = DateFormat('HH:mm').format(currentDateTime);
 
-    // ตรวจสอบว่า date_checked, time_checked, equipment_status และ user_type ได้รับการกรอกหรือเลือก
+    /*// ตรวจสอบว่า date_checked, time_checked, equipment_status และ user_type ได้รับการกรอกหรือเลือก
     if (_dateController.text.isEmpty ||
         _timeController.text.isEmpty ||
         equipmentStatus.values.any((status) => status.isEmpty) ||
@@ -100,7 +163,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
         const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
       );
       return; // หยุดการบันทึกข้อมูลถ้าข้อมูลไม่ครบ
-    }
+    }*/
 
     CollectionReference formChecks =
         FirebaseFirestore.instance.collection('form_checks');
@@ -114,8 +177,8 @@ class _FormCheckPageState extends State<FormCheckPage> {
     }
 
     try {
-      // บันทึกข้อมูลลงใน collection 'form_checks'
-      await formChecks.doc(docId).set({
+      // เตรียมข้อมูลที่ต้องการบันทึก
+      Map<String, dynamic> formCheckData = {
         'date_checked': _dateController.text,
         'time_checked': _timeController.text, // บันทึกเวลา
         'inspector': selectedStaff ?? _inspectorController.text,
@@ -123,7 +186,26 @@ class _FormCheckPageState extends State<FormCheckPage> {
         'equipment_status': equipmentStatus,
         'remarks': _remarkController.text,
         'tank_id': widget.tankId,
-      }).then((value) {
+      };
+
+      // ถ้าเป็น CO2 ให้บันทึกข้อมูลในลักษณะพิเศษ
+      if (fireTankType == 'CO2') {
+        formCheckData['equipment_status'] = {
+          'สภาพแรงดัน': equipmentStatus['สภาพแรงดัน'],
+        };
+        formCheckData['Weight_tank'] = _weightController.text; // น้ำหนัก
+      }
+      // ถ้าเป็น BF2000 หรือ ผงเคมี จะบันทึกเป็นค่าว่างใน Weight_tank
+      else if (fireTankType == 'BF2000' || fireTankType == 'ผงเคมี') {
+        formCheckData['equipment_status'] = {
+          'มาตรวัด': equipmentStatus['มาตรวัด'],
+          'สภาพผงเคมี': equipmentStatus['สภาพผงเคมี'],
+        };
+        formCheckData['Weight_tank'] = ''; // น้ำหนักจะเป็นค่าว่าง
+      }
+
+      // บันทึกข้อมูลลงใน collection 'form_checks'
+      await formChecks.doc(docId).set(formCheckData).then((value) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อยแล้ว')),
         );
@@ -167,6 +249,7 @@ class _FormCheckPageState extends State<FormCheckPage> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
+            // แสดงภาพเมื่อได้ข้อมูลแล้ว
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -307,6 +390,35 @@ class _FormCheckPageState extends State<FormCheckPage> {
                 ),
               ),
             ),
+            SizedBox(height: 10),
+            if (imageBytes != null)
+              Center(
+                child: Container(
+                  width: 150, // กำหนดความกว้าง
+                  height: 150, // กำหนดความสูง
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8.0), // ทำมุมให้โค้ง
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.5),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: Offset(0, 3), // การย้ายเงา
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8.0), // ทำให้มุมโค้ง
+                    child: Image.memory(
+                      imageBytes!,
+                      width: double.infinity, // ให้ขนาดภาพยืดตามที่ตั้งไว้
+                      height: double.infinity, // ให้ขนาดภาพยืดตามที่ตั้งไว้
+                      fit: BoxFit.cover, // ให้ภาพเต็มภายในกรอบ
+                    ),
+                  ),
+                ),
+              ),
+
             SizedBox(height: 20),
             Text(
               'Tank ID: ${widget.tankId}',
@@ -332,49 +444,61 @@ class _FormCheckPageState extends State<FormCheckPage> {
                       'รายการตรวจสอบ',
                       style: TextStyle(fontSize: fontSize),
                     ),
+                    // แสดงรายการตรวจสอบตามประเภท
                     Column(
                       children: equipmentStatus.keys.map((String key) {
                         return Padding(
                           padding: padding,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                key,
-                                style: TextStyle(fontSize: fontSize),
-                              ),
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: equipmentStatus[key] == 'ปกติ',
-                                    onChanged: (bool? value) {
-                                      setState(() {
-                                        equipmentStatus[key] =
-                                            value! ? 'ปกติ' : 'ชำรุด';
-                                      });
-                                    },
+                          child: key == 'น้ำหนัก(กก.)'
+                              ? TextField(
+                                  controller: _weightController,
+                                  decoration: InputDecoration(
+                                    labelText: key,
+                                    labelStyle: TextStyle(fontSize: fontSize),
                                   ),
-                                  Text(
-                                    'ปกติ',
-                                    style: TextStyle(fontSize: fontSize),
-                                  ),
-                                  Checkbox(
-                                    value: equipmentStatus[key] == 'ชำรุด',
-                                    onChanged: (bool? value) {
-                                      setState(() {
-                                        equipmentStatus[key] =
-                                            value! ? 'ชำรุด' : 'ปกติ';
-                                      });
-                                    },
-                                  ),
-                                  Text(
-                                    'ชำรุด',
-                                    style: TextStyle(fontSize: fontSize),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                  style: TextStyle(fontSize: fontSize),
+                                )
+                              : Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      key,
+                                      style: TextStyle(fontSize: fontSize),
+                                    ),
+                                    Row(
+                                      children: [
+                                        Checkbox(
+                                          value: equipmentStatus[key] == 'ปกติ',
+                                          onChanged: (bool? value) {
+                                            setState(() {
+                                              equipmentStatus[key] =
+                                                  value! ? 'ปกติ' : 'ชำรุด';
+                                            });
+                                          },
+                                        ),
+                                        Text(
+                                          'ปกติ',
+                                          style: TextStyle(fontSize: fontSize),
+                                        ),
+                                        Checkbox(
+                                          value:
+                                              equipmentStatus[key] == 'ชำรุด',
+                                          onChanged: (bool? value) {
+                                            setState(() {
+                                              equipmentStatus[key] =
+                                                  value! ? 'ชำรุด' : 'ปกติ';
+                                            });
+                                          },
+                                        ),
+                                        Text(
+                                          'ไม่ปกติ',
+                                          style: TextStyle(fontSize: fontSize),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                         );
                       }).toList(),
                     ),

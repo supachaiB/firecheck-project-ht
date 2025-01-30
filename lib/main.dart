@@ -10,6 +10,7 @@ import 'admin/fire_tank_status.dart';
 import 'user/form_check.dart';
 import 'admin/Fire_tank_management.dart';
 import 'admin/buildings_management.dart';
+import 'admin/fire_tank_types.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,11 @@ class MyApp extends StatelessWidget {
           case '/BuildingManagement':
             return MaterialPageRoute(
                 builder: (context) => BuildingManagementScreen());
+          case '/FireTankTypes':
+            return MaterialPageRoute(builder: (context) => FireTankTypes());
+          case '/FireTankStatusPage':
+            return MaterialPageRoute(
+                builder: (context) => FireTankStatusPage());
           default:
             // เส้นทางเริ่มต้น
             return MaterialPageRoute(

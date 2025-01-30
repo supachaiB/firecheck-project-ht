@@ -12,15 +12,13 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
   final _floorsController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  bool _isFormVisible = false; // ควบคุมการแสดงผลของฟอร์มกรอกข้อมูล
+  bool _isFormVisible = false;
 
-  // ฟังก์ชันสำหรับการเพิ่มอาคารลง Firestore
   Future<void> _addBuilding() async {
     String name = _nameController.text;
     int totalFloors = int.tryParse(_floorsController.text) ?? 0;
     String description = _descriptionController.text;
 
-    // ตรวจสอบว่ามีการกรอกชื่ออาคารและจำนวนชั้นทั้งหมด
     if (name.isEmpty || totalFloors <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('กรุณากรอกชื่ออาคารและจำนวนชั้นทั้งหมด')),
@@ -29,18 +27,15 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
     }
 
     try {
-      // เพิ่มข้อมูลใน Firestore โดยไม่สนใจว่า "รายละเอียด" จะกรอกหรือไม่
       await FirebaseFirestore.instance.collection('buildings').add({
         'name': name,
-        'totalFloors': totalFloors,
-        'description': description.isEmpty
-            ? ''
-            : description, // ถ้าไม่มีรายละเอียดใส่ข้อความ 'ไม่มีรายละเอียด'
+        'totalFloors': totalFloors.toString(),
+        'description': description.isEmpty ? '' : description,
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('เพิ่มอาคารเรียบร้อย')),
       );
-      _clearInputs(); // เคลียร์ฟอร์มหลังการเพิ่มอาคาร
+      _clearInputs();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
@@ -48,14 +43,12 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
     }
   }
 
-  // ฟังก์ชันสำหรับการเคลียร์ข้อมูลหลังจากเพิ่มอาคาร
   void _clearInputs() {
     _nameController.clear();
     _floorsController.clear();
     _descriptionController.clear();
   }
 
-  // ฟังก์ชันดึงข้อมูลอาคารจาก Firestore
   Stream<List<Map<String, dynamic>>> _getBuildings() {
     return FirebaseFirestore.instance
         .collection('buildings')
@@ -72,6 +65,78 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
     });
   }
 
+  Future<void> _editBuilding(String id) async {
+    final buildingRef =
+        FirebaseFirestore.instance.collection('buildings').doc(id);
+    final snapshot = await buildingRef.get();
+    final buildingData = snapshot.data();
+
+    if (buildingData != null) {
+      _nameController.text = buildingData['name'];
+      _floorsController.text = buildingData['totalFloors'];
+      _descriptionController.text = buildingData['description'];
+
+      setState(() {
+        _isFormVisible = true;
+      });
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('แก้ไขข้อมูลอาคาร'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(labelText: 'ชื่ออาคาร'),
+              ),
+              TextField(
+                controller: _floorsController,
+                decoration: InputDecoration(labelText: 'จำนวนชั้นทั้งหมด'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: _descriptionController,
+                decoration: InputDecoration(labelText: 'รายละเอียด'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                String name = _nameController.text;
+                int totalFloors = int.tryParse(_floorsController.text) ?? 0;
+                String description = _descriptionController.text;
+
+                if (name.isEmpty || totalFloors <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
+                  );
+                } else {
+                  await buildingRef.update({
+                    'name': name,
+                    'totalFloors': totalFloors.toString(),
+                    'description': description,
+                  });
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text('บันทึกการแก้ไข'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await buildingRef.delete();
+                Navigator.of(context).pop();
+              },
+              child: Text('ลบอาคาร'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,7 +147,6 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // แสดงฟอร์มกรอกข้อมูลเมื่อ _isFormVisible เป็น true
             Visibility(
               visible: _isFormVisible,
               child: Column(
@@ -115,8 +179,6 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
               ),
             ),
             SizedBox(height: 20),
-
-            // ส่วนแสดงรายชื่ออาคาร
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _getBuildings(),
@@ -143,21 +205,29 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
                         title: Text(building['name']),
                         subtitle: Text(
                             'จำนวนทั้งหมด: ${building['totalFloors']} ชั้น'),
-                        onTap: () {
-                          // เปิดรายละเอียดอาคาร
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text(building['name']),
-                              content: Text(building['description']),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  child: Text('ปิด'),
-                                ),
-                              ],
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit),
+                              onPressed: () {
+                                _editBuilding(
+                                    building['id']); // เรียกฟังก์ชันแก้ไข
+                              },
                             ),
-                          );
+                            IconButton(
+                              icon: Icon(Icons.delete),
+                              onPressed: () async {
+                                final buildingRef = FirebaseFirestore.instance
+                                    .collection('buildings')
+                                    .doc(building['id']);
+                                await buildingRef.delete();
+                              },
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          _editBuilding(building['id']);
                         },
                       );
                     },
@@ -168,14 +238,13 @@ class _BuildingManagementScreenState extends State<BuildingManagementScreen> {
           ],
         ),
       ),
-      // ปุ่มเพิ่มอาคาร (FloatingActionButton)
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           setState(() {
-            _isFormVisible = !_isFormVisible; // สลับสถานะการแสดงฟอร์ม
+            _isFormVisible = !_isFormVisible;
           });
         },
-        child: Icon(_isFormVisible ? Icons.close : Icons.add), // เปลี่ยนไอคอน
+        child: Icon(_isFormVisible ? Icons.close : Icons.add),
       ),
     );
   }

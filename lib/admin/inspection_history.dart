@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firecheck_setup/admin/fire_tank_status.dart';
 import 'package:firecheck_setup/admin/dashboard_section/status_summary.dart';
 import 'package:firecheck_setup/admin/dashboard_section/scheduleBox.dart';
-import 'package:firecheck_setup/admin/fire_tank_status.dart';
+//import 'package:firecheck_setup/admin/fire_tank_status.dart';
 
 class InspectionHistoryPage extends StatefulWidget {
   const InspectionHistoryPage({super.key});
@@ -17,6 +17,10 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
   String? selectedFloor;
   String? selectedStatus;
   String? sortBy = 'tank_number'; // เริ่มต้นการเรียงตามหมายเลขถัง
+
+  List<String> _buildings = [];
+  List<String> _floors = [];
+  List<Map<String, dynamic>> combinedData = [];
 
   int remainingTime = FireTankStatusPageState.calculateRemainingTime();
   int remainingQuarterTimeInSeconds =
@@ -73,6 +77,7 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
   void initState() {
     super.initState();
     _fetchFireTankData(); // ดึงข้อมูลเมื่อหน้าเริ่มต้น
+    fetchBuildings();
 
     remainingQuarterTimeInSeconds =
         FireTankStatusPageState.calculateNextQuarterEnd()
@@ -80,7 +85,38 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
             .inSeconds;
   }
 
-  List<Map<String, dynamic>> combinedData = [];
+  Future<void> fetchBuildings() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('firetank_Collection')
+        .get();
+    final buildings =
+        snapshot.docs.map((doc) => doc['building'] as String).toSet().toList();
+
+    setState(() {
+      _buildings = buildings;
+    });
+  }
+
+  /// ดึงรายชื่อชั้นของอาคารที่เลือก
+  Future<void> fetchFloors(String building) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('firetank_Collection')
+        .where('building', isEqualTo: building)
+        .get();
+
+    final floors = snapshot.docs
+        .map((doc) => doc['floor'].toString()) // แปลงเป็น String
+        .toSet()
+        .toList();
+
+    floors.sort(
+        (a, b) => int.parse(a).compareTo(int.parse(b))); // เรียงจากน้อยไปมาก
+
+    setState(() {
+      _floors = floors;
+      selectedFloor = null;
+    });
+  }
 
   // ฟังก์ชันสำหรับการแก้ไขสถานะการตรวจสอบ
   Future<void> _updateStatus(String tankId, String newStatus) async {
@@ -224,40 +260,40 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                           children: [
                             Expanded(
                               child: DropdownButton<String>(
-                                value: selectedBuilding,
-                                isExpanded: true,
                                 hint: const Text('เลือกอาคาร'),
-                                items:
-                                    ['10 ชั้น', 'หลวงปู่ขาว'].map((building) {
-                                  return DropdownMenuItem<String>(
-                                    value: building,
-                                    child: Text(building),
-                                  );
-                                }).toList(),
+                                value: selectedBuilding,
                                 onChanged: (value) {
                                   setState(() {
                                     selectedBuilding = value;
+                                    selectedFloor = null;
+                                    fetchFloors(
+                                        value!); // อัปเดตรายชื่อชั้นเมื่อเลือกอาคาร
                                   });
                                 },
+                                items: _buildings
+                                    .map((building) => DropdownMenuItem<String>(
+                                          value: building,
+                                          child: Text(building),
+                                        ))
+                                    .toList(),
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: DropdownButton<String>(
-                                value: selectedFloor,
-                                isExpanded: true,
                                 hint: const Text('เลือกชั้น'),
-                                items: ['1', '2', '3'].map((building) {
-                                  return DropdownMenuItem<String>(
-                                    value: building.toString(),
-                                    child: Text(building.toString()),
-                                  );
-                                }).toList(),
+                                value: selectedFloor,
                                 onChanged: (value) {
                                   setState(() {
                                     selectedFloor = value;
                                   });
                                 },
+                                items: _floors
+                                    .map((floor) => DropdownMenuItem<String>(
+                                          value: floor,
+                                          child: Text(floor),
+                                        ))
+                                    .toList(),
                               ),
                             ),
                           ],
@@ -292,6 +328,26 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                             const SizedBox(width: 10),
                           ],
                         ),
+                        // **ปุ่มรีเซ็ตตัวกรอง**
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  selectedBuilding = null;
+                                  selectedFloor = null;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromARGB(
+                                    255, 118, 36, 212), // สีของปุ่ม
+                              ),
+                              child: const Text('รีเซ็ตตัวกรองทั้งหมด'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
                       ],
                     ),
                   ),

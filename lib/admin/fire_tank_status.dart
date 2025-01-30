@@ -41,7 +41,6 @@ class FireTankStatusPageState extends State<FireTankStatusPage> {
     final nextResetDate =
         DateTime(now.year, now.month + 1, 1); // วันที่ 1 ของเดือนถัดไป
     return nextResetDate.difference(now).inSeconds; // เวลาที่เหลือในวินาที
-    //return 5;
   }
 
   static DateTime calculateNextQuarterEnd() {
@@ -147,121 +146,6 @@ class FireTankStatusPageState extends State<FireTankStatusPage> {
       appBar: AppBar(
         title: Text('สถานะถังดับเพลิง'),
         backgroundColor: Colors.redAccent,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            _buildScheduleBox(),
-            SizedBox(height: 10),
-            StreamBuilder<Map<String, int>>(
-              stream: combinedStreams,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
-                final data = snapshot.data!;
-                return _buildStatusSummaryBox(
-                  totalTanks: data["totalTanks"]!,
-                  checkedCount: data["checkedCount"]!,
-                  brokenCount: data["brokenCount"]!,
-                  repairCount: data["repairCount"]!,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ฟังก์ชันสร้างกล่องสรุปภาพรวมสถานะ
-  Widget _buildStatusSummaryBox({
-    required int totalTanks,
-    required int checkedCount,
-    required int brokenCount,
-    required int repairCount,
-  }) {
-    return Card(
-      elevation: 2,
-      margin: EdgeInsets.symmetric(vertical: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildSummaryCard("ถังทั้งหมด", totalTanks, Colors.blue),
-            _buildSummaryCard("ตรวจสอบแล้ว", checkedCount, Colors.green),
-            _buildSummaryCard(
-                "ยังไม่ตรวจสอบ",
-                totalTanks - checkedCount - brokenCount - repairCount,
-                Colors.grey),
-            _buildSummaryCard("ชำรุด", brokenCount, Colors.red),
-            _buildSummaryCard("ส่งซ่อม", repairCount, Colors.orange),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ฟังก์ชันสร้างการ์ดแสดงสรุปสถานะ
-  Widget _buildSummaryCard(String label, int count, Color color) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, color: color),
-        ),
-        SizedBox(height: 8),
-        Text(
-          '$count',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  // ฟังก์ชันสร้างกล่องกำหนดการ
-  Widget _buildScheduleBox() {
-    int days = remainingTime ~/ (24 * 3600); // คำนวณจำนวนวัน
-    int hours = (remainingTime % (24 * 3600)) ~/ 3600; // คำนวณชั่วโมง
-    int minutes = (remainingTime % 3600) ~/ 60; // คำนวณนาที
-    int seconds = remainingTime % 60; // คำนวณวินาที
-
-    int quarterDays = remainingQuarterTime ~/ (24 * 3600);
-    int quarterHours = (remainingQuarterTime % (24 * 3600)) ~/ 3600;
-    int quarterMinutes = (remainingQuarterTime % 3600) ~/ 60;
-    int quarterSeconds = remainingQuarterTime % 60;
-    return Align(
-      alignment: Alignment.centerLeft, // จัดชิดซ้าย
-      child: Card(
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // ชิดซ้ายในกล่อง
-            children: [
-              Text(
-                "กำหนดการตรวจ",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.redAccent,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "ผู้ใช้ทั่วไปเหลือ :  $days วัน $hours ชั่วโมง $minutes นาที $seconds วินาที",
-                style: TextStyle(fontSize: 14),
-              ),
-              Text(
-                "ช่างเทคนิคเหลือ : $quarterDays วัน $quarterHours ชั่วโมง $quarterMinutes นาที $quarterSeconds วินาที",
-                style: TextStyle(fontSize: 14),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
