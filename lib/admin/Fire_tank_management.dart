@@ -361,7 +361,7 @@ class FireTankFormPage extends StatefulWidget {
 class _FireTankFormPageState extends State<FireTankFormPage> {
   final TextEditingController _fireExtinguisherIdController =
       TextEditingController();
-  String? _type;
+  String? _type; // ตัวแปร _type อาจจะเป็น String
   String? _building;
   String? _floor;
   DateTime _installationDate = DateTime.now();
@@ -482,7 +482,16 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
     try {
       final newId = _fireExtinguisherIdController.text;
 
+      // แสดงค่าตัวแปรที่ใช้ในการบันทึกข้อมูล
+      print('newId: $newId');
+      print('type: $_type');
+      print('building: $_building');
+      print('floor: $_floor');
+      print('installationDate: $_installationDate');
+
+      //กรอกให้ครบ
       if (_type == null || _building == null || _floor == null) {
+        print('ข้อมูลไม่ครบ');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
         );
@@ -491,27 +500,41 @@ class _FireTankFormPageState extends State<FireTankFormPage> {
 
       await _generateQRCode(newId);
 
-      // การเพิ่มข้อมูลใหม่
-      await FirebaseFirestore.instance.collection('firetank_Collection').add({
-        'tank_id': newId,
-        'type': _type,
-        'building': _building,
-        'floor': _floor,
-        'status': 'ตรวจสอบแล้ว',
-        'installation_date': _installationDate,
-        'qrcode': _qrCode,
-      });
-      // หลังจากบันทึกข้อมูลเสร็จ
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
-      );
+      print('กำลังบันทึกข้อมูลไปยัง Firestore...');
+      try {
+        DocumentReference docRef = await FirebaseFirestore.instance
+            .collection('firetank_Collection')
+            .add({
+          'tank_id': newId,
+          'type': _type,
+          'building': _building,
+          'floor': _floor,
+          'status': 'ตรวจสอบแล้ว',
+          'installation_date': _installationDate,
+          'qrcode': _qrCode,
+        });
 
-      Navigator.pop(context); // กลับไปที่หน้าก่อนหน้า
+        print('บันทึกข้อมูลสำเร็จ: ${docRef.id}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
+        );
+
+        // เพิ่มการหน่วงเวลาก่อนเปลี่ยนหน้า
+        await Future.delayed(Duration(milliseconds: 500));
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        print("Error saving document: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+        );
+      }
     } catch (e) {
+      print("Error saving document: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
       );
-      print("Error saving document: $e");
     }
   }
 

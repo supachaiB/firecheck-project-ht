@@ -236,7 +236,7 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                   brokenCount: brokenCount,
                   repairCount: repairCount,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 5),
                 // ส่วนตัวกรอง
                 Card(
                   margin: const EdgeInsets.only(bottom: 20),
