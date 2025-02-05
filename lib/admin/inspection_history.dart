@@ -371,10 +371,14 @@ class _InspectionHistoryPageState extends State<InspectionHistoryPage> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color.fromARGB(
-                                    255, 118, 36, 212), // สีของปุ่ม
+                                backgroundColor:
+                                    Colors.blue, // เปลี่ยนพื้นหลังเป็นสีฟ้า
+// สีของปุ่ม
                               ),
-                              child: const Text('รีเซ็ตตัวกรองทั้งหมด'),
+                              child: const Text(
+                                'รีเซ็ตตัวกรองทั้งหมด',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ],
                         ),

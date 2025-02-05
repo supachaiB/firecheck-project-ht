@@ -113,8 +113,13 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fire Tank Management'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text(
+          'Fire Tank Management',
+          style: TextStyle(color: Colors.white), // เปลี่ยนสีข้อความเป็นสีขาว
+        ),
+        backgroundColor: Colors.grey[700],
+        iconTheme:
+            const IconThemeData(color: Colors.white), // เปลี่ยนสีไอคอนเป็นสีขาว
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -199,10 +204,13 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        const Color.fromARGB(255, 118, 36, 212), // สีของปุ่ม
+                    backgroundColor: Colors.blue, // เปลี่ยนพื้นหลังเป็นสีฟ้า
                   ),
-                  child: const Text('รีเซ็ตตัวกรองทั้งหมด'),
+                  child: const Text(
+                    'รีเซ็ตตัวกรองทั้งหมด',
+                    style: TextStyle(
+                        color: Colors.white), // เปลี่ยนตัวหนังสือเป็นสีขาว
+                  ),
                 ),
               ],
             ),
@@ -355,9 +363,11 @@ class _FireTankManagementPageState extends State<FireTankManagementPage> {
             ),
           );
         },
-        child: const Icon(Icons.add),
-        backgroundColor: Colors.deepPurple,
+        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: Colors.blueAccent,
       ),
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.centerDocked, // ทำให้ปุ่มอยู่ตรงกลางล่าง
     );
   }
 }

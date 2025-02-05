@@ -67,8 +67,13 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text(
+          'Dashboard',
+          style: TextStyle(color: Colors.white), // เปลี่ยนสีข้อความเป็นสีขาว
+        ),
+        backgroundColor: Colors.grey[700],
+        iconTheme:
+            const IconThemeData(color: Colors.white), // เปลี่ยนสีไอคอนเป็นสีขาว
       ),
       drawer: _buildDrawer(context),
       body: StreamBuilder<QuerySnapshot>(
@@ -129,9 +134,9 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: <Widget>[
-          const DrawerHeader(
+          DrawerHeader(
             decoration: BoxDecoration(
-              color: Colors.deepPurple,
+              color: Colors.grey[850], // เปลี่ยนเป็นสีเทาเข้ม
             ),
             child: Text(
               'เมนู',
